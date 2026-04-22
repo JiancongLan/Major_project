@@ -1,0 +1,8 @@
+.venv311/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+database_data/
+shared/outputs/
+control/

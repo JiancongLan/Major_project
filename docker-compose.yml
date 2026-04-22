@@ -1,0 +1,221 @@
+x-sim-config: &sim-config
+  SIM_SEASON: "spring"
+  SIM_START_DATE: "2013-02-27 00:00:00"
+  SIM_END_DATE: "2014-02-27 23:00:00"
+  TARIFF_TARGET_YEAR: "2025"
+  TARIFF_AGG: "median"
+  TOU_CSV_PATH: "ToU_London.csv"
+  FIT_CSV_PATH: "FiT_London.csv"
+
+x-household-env: &household-env
+  <<: *sim-config
+  PARAMS_FILE: "household_params.csv"
+  OUTPUT_ROOT: "/shared/outputs"
+  FORECAST_MODE: "cnn6"
+  CNN_MODEL_PATH: "models/LSTM64x32_global.keras"
+  FUTURE_SIGNAL_WEIGHTS: "1.0,0.85,0.70,0.55,0.40,0.25"
+
+x-household-common: &household-common
+  build: ./Households
+  volumes:
+    - ./Households:/app
+    - ./shared/outputs:/shared/outputs
+
+services:
+  household_mac000018:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000018" }
+
+  household_mac000019:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000019" }
+
+  household_mac000021:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000021" }
+
+  household_mac000022:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000022" }
+
+  household_mac000033:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000033" }
+
+  household_mac000038:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000038" }
+
+  household_mac000040:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000040" }
+
+  household_mac000041:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000041" }
+
+  household_mac000055:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000055" }
+
+  household_mac000056:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000056" }
+
+  household_mac000060:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000060" }
+
+  household_mac000068:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000068" }
+
+  household_mac000083:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000083" }
+
+  household_mac000085:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000085" }
+
+  household_mac000087:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000087" }
+
+  household_mac000089:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000089" }
+
+  household_mac000090:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000090" }
+
+  household_mac000093:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000093" }
+
+  household_mac000098:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000098" }
+
+  household_mac000099:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000099" }
+
+  household_mac000100:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000100" }
+
+  household_mac000104:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000104" }
+
+  household_mac000111:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000111" }
+
+  household_mac000112:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000112" }
+
+  household_mac000115:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000115" }
+
+  household_mac000117:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000117" }
+
+  household_mac000118:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000118" }
+
+  household_mac000121:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000121" }
+
+  household_mac000122:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000122" }
+
+  household_mac000123:
+    <<: *household-common
+    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000123" }
+
+  market:
+    build: ./market_api
+    environment:
+      <<: *sim-config
+    volumes:
+      - ./market_api:/app
+      - ./market_operator:/repos/market_operator
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  balancing:
+    build: ./balancing_api
+    environment:
+      <<: *sim-config
+    volumes:
+      - ./balancing_api:/app
+      - ./balancing_operator:/repos/balancing_operator
+      - ./market_operator:/repos/market_operator
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  database:
+    build: ./database
+    volumes:
+      - ./database:/app
+      - ./shared/data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  orchestrator:
+    build: ./orchestrator
+    environment:
+      HOUSEHOLD_IDS: "MAC000018,MAC000019,MAC000021,MAC000022,MAC000033,MAC000038,MAC000040,MAC000041,MAC000055,MAC000056,MAC000060,MAC000068,MAC000083,MAC000085,MAC000087,MAC000089,MAC000090,MAC000093,MAC000098,MAC000099,MAC000100,MAC000104,MAC000111,MAC000112,MAC000115,MAC000117,MAC000118,MAC000121,MAC000122,MAC000123"
+      OUTPUT_ROOT: "/shared/outputs"
+      TICK_SECONDS: "1.0"
+      MAX_SLOTS: ""
+      CONTROL_FILE: "/control/sim_control.json"
+      MARKET_URL: "http://market:8000"
+      BALANCING_URL: "http://balancing:8000"
+      DATABASE_URL: "http://database:8000"
+    volumes:
+      - ./orchestrator:/app
+      - ./shared/outputs:/shared/outputs
+      - ./shared/control:/control
+    depends_on:
+      market:
+        condition: service_healthy
+      balancing:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+
+  dashboard:
+    build: ./dashboard
+    environment:
+      <<: *sim-config
+      DATABASE_URL: "http://database:8000"
+      CONTROL_FILE: "/control/sim_control.json"
+      MARKET_REPO_ROOT: "/repos/market_operator"
+    volumes:
+      - ./dashboard:/app
+      - ./market_operator:/repos/market_operator
+      - ./shared/control:/control
+    ports:
+      - "8501:8501"
+    depends_on:
+      database:
+        condition: service_healthy

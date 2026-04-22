@@ -1,0 +1,125 @@
+version: "3.9"
+
+x-household-env: &household-env
+  PARAMS_FILE: household_params.csv
+  OUTPUT_ROOT: /shared/outputs
+  FORECAST_MODE: cnn6
+  CNN_MODEL_PATH: models/LSTM64x32_global.keras
+  SIM_START_DATE: "2013-02-27 00:00:00"
+  SIM_END_DATE: "2014-02-27 23:00:00"
+  PYTHONUNBUFFERED: "1"
+
+x-household-common: &household-common
+  build:
+    context: ./Households
+    dockerfile: Dockerfile
+  volumes:
+    - ./Households:/app
+    - /mnt/c/MicrogridShared/outputs:/shared/outputs
+  restart: unless-stopped
+
+services:
+  household_mac000018:
+    <<: *household-common
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: MAC000018
+
+  household_mac000019:
+    <<: *household-common
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: MAC000019
+
+  household_mac000021:
+    <<: *household-common
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: MAC000021
+
+  household_mac000022:
+    <<: *household-common
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: MAC000022
+
+  household_mac000033:
+    <<: *household-common
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: MAC000033
+
+  market:
+    build:
+      context: ./market_api
+    volumes:
+      - ./market_api:/app
+      - ./market_operator:/repos/market_operator
+    environment:
+      TARIFF_TARGET_YEAR: "2025"
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+
+  balancing:
+    build:
+      context: ./balancing_api
+    volumes:
+      - ./balancing_api:/app
+      - ./balancing_operator:/repos/balancing_operator
+      - ./market_operator:/repos/market_operator
+    environment:
+      TARIFF_TARGET_YEAR: "2025"
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+
+  database:
+    build:
+      context: ./database
+    volumes:
+      - ./database:/app
+      - ./database_data:/data
+    environment:
+      DB_PATH: /data/microgrid.db
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+    volumes:
+      - ./orchestrator:/app
+      - /mnt/c/MicrogridShared/outputs:/shared/outputs
+      - ./control:/control
+    environment:
+      MARKET_URL: http://market:8000
+      BALANCING_URL: http://balancing:8000
+      DATABASE_URL: http://database:8000
+      OUTPUT_ROOT: /shared/outputs
+      CONTROL_FILE: /control/sim_control.json
+      HOUSEHOLD_IDS: "MAC000018,MAC000019,MAC000021,MAC000022,MAC000033,MAC000038,MAC000040,MAC000041,MAC000055,MAC000056,MAC000060,MAC000068,MAC000083,MAC000085,MAC000087"
+      TICK_SECONDS: "1.0"
+      MAX_SLOTS: ""
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      - market
+      - balancing
+      - database
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ./dashboard
+    volumes:
+      - ./dashboard:/app
+      - ./control:/control
+      - ./market_operator:/repos/market_operator
+    environment:
+      DATABASE_URL: http://database:8000
+      CONTROL_FILE: /control/sim_control.json
+      TARIFF_TARGET_YEAR: "2025"
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8501:8501"
+    depends_on:
+      - database
+    restart: unless-stopped
