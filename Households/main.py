@@ -18,10 +18,9 @@ SIM_START_DATE = os.getenv("SIM_START_DATE")
 SIM_END_DATE = os.getenv("SIM_END_DATE")
 
 FORECAST_MODE = os.getenv("FORECAST_MODE", "cnn6")
-CNN_MODEL_PATH = os.getenv("CNN_MODEL_PATH", "models/LSTM64x32_global.keras")
 FUTURE_SIGNAL_WEIGHTS = os.getenv("FUTURE_SIGNAL_WEIGHTS", "1.0,0.85,0.70,0.55,0.40,0.25")
 
-# Keep only physically meaningful optional household-variation knobs.
+
 OPTIONAL_NUMERIC_DEFAULTS = {
     "pv_shading_factor": 1.0,
     "pv_time_shift_hours": 0.0,
@@ -198,15 +197,17 @@ def save_outputs(
 
 
 cfg = load_household_row(HOUSEHOLD_ID, PARAMS_FILE)
+MODEL_PATH = str(cfg.get("model_path", "")).strip()
+if not MODEL_PATH:
+    raise ValueError(f"No model_path found in {PARAMS_FILE} for household {HOUSEHOLD_ID}")
 
 forecast_df, metrics = predict_house_demand(
     house_id=HOUSEHOLD_ID,
-    model_path=cfg.get("model_path", "models/CNN_LSTM.keras"),
+    model_path=MODEL_PATH,
     start_date=SIM_START_DATE,
     end_date=SIM_END_DATE,
     season=SIM_SEASON,
     forecast_mode=FORECAST_MODE,
-    cnn_model_path=CNN_MODEL_PATH,
 )
 forecast_df = prepare_forecast_df(forecast_df)
 
@@ -260,7 +261,6 @@ print(f"Household run complete: {HOUSEHOLD_ID}")
 print(f"Outputs saved to: {out_dir}")
 print(f"Requested season: {SIM_SEASON}")
 print(f"Forecast mode: {FORECAST_MODE}")
-print(f"CNN model path: {CNN_MODEL_PATH}")
 print(f"Future signal weights: {WEIGHTS}")
 
 if not forecast_df.empty:

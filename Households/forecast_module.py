@@ -29,15 +29,11 @@ def select_house_window(
 ) -> pd.DataFrame:
     df = house_df.copy()
 
-    date_filtered = False
-
     if start_date is not None:
         df = df[df["DateTime"] >= pd.to_datetime(start_date)].copy()
-        date_filtered = True
 
     if end_date is not None:
         df = df[df["DateTime"] <= pd.to_datetime(end_date)].copy()
-        date_filtered = True
 
     if season is not None:
         season = season.lower().strip()
@@ -59,34 +55,27 @@ def select_house_window(
         seasonal_df = df[df["DateTime"].dt.month.isin(months)].copy()
 
         if seasonal_df.empty:
-            range_msg = ""
-            if start_date is not None or end_date is not None:
-                range_msg = f" inside date window {start_date} to {end_date}"
-            raise ValueError(f"No rows found for season '{season}'{range_msg}.")
+            raise ValueError(f"No rows found for season '{season}'.")
 
-        if date_filtered:
-            selected = seasonal_df.sort_values("DateTime").reset_index(drop=True)
+        # Correct winter grouping: Dec belongs to next winter season
+        if season == "winter":
+            seasonal_df["season_year"] = seasonal_df["DateTime"].dt.year
+            seasonal_df.loc[
+                seasonal_df["DateTime"].dt.month == 12, "season_year"
+            ] = seasonal_df.loc[
+                seasonal_df["DateTime"].dt.month == 12, "DateTime"
+            ].dt.year + 1
         else:
-            # Only group by season-year when no explicit date window was supplied.
-            # If a date window is supplied, the user is already telling us which year to use.
-            if season == "winter":
-                seasonal_df["season_year"] = seasonal_df["DateTime"].dt.year
-                seasonal_df.loc[
-                    seasonal_df["DateTime"].dt.month == 12, "season_year"
-                ] = seasonal_df.loc[
-                    seasonal_df["DateTime"].dt.month == 12, "DateTime"
-                ].dt.year + 1
-            else:
-                seasonal_df["season_year"] = seasonal_df["DateTime"].dt.year
+            seasonal_df["season_year"] = seasonal_df["DateTime"].dt.year
 
-            best_season_year = seasonal_df["season_year"].value_counts().idxmax()
+        best_season_year = seasonal_df["season_year"].value_counts().idxmax()
 
-            selected = (
-                seasonal_df[seasonal_df["season_year"] == best_season_year]
-                .drop(columns=["season_year"])
-                .sort_values("DateTime")
-                .reset_index(drop=True)
-            )
+        selected = (
+            seasonal_df[seasonal_df["season_year"] == best_season_year]
+            .drop(columns=["season_year"])
+            .sort_values("DateTime")
+            .reset_index(drop=True)
+        )
 
         if len(selected) <= WINDOW_SIZE:
             raise ValueError(
@@ -94,15 +83,6 @@ def select_house_window(
                 f"which is not enough for WINDOW_SIZE={WINDOW_SIZE}."
             )
 
-        return selected
-
-    if date_filtered and not df.empty:
-        selected = df.sort_values("DateTime").reset_index(drop=True)
-        if len(selected) <= WINDOW_SIZE:
-            raise ValueError(
-                f"Date selection has only {len(selected)} rows, "
-                f"which is not enough for WINDOW_SIZE={WINDOW_SIZE}."
-            )
         return selected
 
     if "split" in df.columns:
@@ -271,7 +251,7 @@ def _predict_lstm_one_step(
 
 def _predict_cnn_six_step(
     house_id: str,
-    cnn_model_path: str,
+    model_path: str,
     start_date: str | None,
     end_date: str | None,
     season: str | None,
@@ -294,7 +274,7 @@ def _predict_cnn_six_step(
     if len(x_test) == 0:
         raise ValueError(f"Not enough rows for {house_id} for six-step forecast.")
 
-    model = tf.keras.models.load_model(base_dir / cnn_model_path, compile=False)
+    model = tf.keras.models.load_model(base_dir / model_path, compile=False)
     pred_scaled = np.asarray(model.predict(x_test, verbose=0))
 
     if pred_scaled.ndim == 3:
@@ -345,14 +325,13 @@ def predict_house_demand(
     end_date: str | None = None,
     season: str | None = None,
     forecast_mode: str = "cnn6",
-    cnn_model_path: str = "models/CNN_LSTM.keras",
 ):
     forecast_mode = (forecast_mode or "cnn6").lower().strip()
 
     if forecast_mode == "cnn6":
         return _predict_cnn_six_step(
             house_id=house_id,
-            cnn_model_path=cnn_model_path,
+            model_path=model_path,
             start_date=start_date,
             end_date=end_date,
             season=season,

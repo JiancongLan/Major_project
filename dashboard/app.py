@@ -427,16 +427,23 @@ def base_figure(y_title: str, height: int = 350):
     return fig
 
 
-def add_line(fig, x, y, name, color, width=1.6):
+def add_line(fig, x, y, name, color, width=1.6, dash="solid"):
     fig.add_trace(
         go.Scatter(
             x=x,
             y=y,
             mode="lines",
             name=name,
-            line=dict(width=width, color=color),
+            line=dict(width=width, color=color, dash=dash),
         )
     )
+
+
+PLOTLY_CHART_CONFIG = {
+    "displayModeBar": True,
+    "scrollZoom": True,
+    "doubleClick": "reset",
+}
 
 
 @st.cache_data(ttl=0.2, show_spinner=False)
@@ -444,14 +451,6 @@ def load_state():
     r = requests.get(f"{DATABASE_URL}/state", timeout=5)
     r.raise_for_status()
     return r.json()
-
-
-@st.cache_data(ttl=0.2, show_spinner=False)
-def load_summary() -> pd.DataFrame:
-    r = requests.get(f"{DATABASE_URL}/summary", timeout=5)
-    r.raise_for_status()
-    data = r.json()
-    return pd.DataFrame(data) if data else pd.DataFrame()
 
 
 @st.cache_data(ttl=1, show_spinner=False)
@@ -647,6 +646,36 @@ current_slots_per_second = 1.0 / max(float(current_control.get("tick_seconds", 1
 active_tick_seconds = max(float(current_control.get("tick_seconds", 1.0)), 0.001)
 active_slots_per_second = 1.0 / active_tick_seconds
 
+@st.cache_data(ttl=0.2, show_spinner=False)
+def load_summary() -> pd.DataFrame:
+    r = requests.get(f"{DATABASE_URL}/summary", timeout=5)
+    r.raise_for_status()
+    data = r.json()
+    return pd.DataFrame(data) if data else pd.DataFrame()
+
+def compute_observed_slots_per_second(summary_df: pd.DataFrame, window: int = 8) -> float | None:
+    if summary_df.empty or "recorded_at" not in summary_df.columns or "slot" not in summary_df.columns:
+        return None
+
+    recent = summary_df[["slot", "recorded_at"]].copy()
+    recent["recorded_at"] = pd.to_datetime(recent["recorded_at"], errors="coerce")
+    recent["slot"] = pd.to_numeric(recent["slot"], errors="coerce")
+    recent = recent.dropna(subset=["slot", "recorded_at"]).sort_values("slot").tail(window)
+
+    if len(recent) < 2:
+        return None
+
+    elapsed = (recent["recorded_at"].iloc[-1] - recent["recorded_at"].iloc[0]).total_seconds()
+    slots_advanced = float(recent["slot"].iloc[-1] - recent["slot"].iloc[0])
+
+    if elapsed <= 0 or slots_advanced <= 0:
+        return None
+
+    return slots_advanced / elapsed
+
+summary_df = load_summary()
+observed_slots_per_second = compute_observed_slots_per_second(summary_df)
+
 with st.sidebar:
     st.markdown("## Dashboard Controls")
 
@@ -669,9 +698,15 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("## Simulation Controls")
+
+    observed_speed_text = (
+        f"{observed_slots_per_second:.2f} slots/s"
+        if observed_slots_per_second is not None else "Not enough data yet"
+    )
+    speed_up_active = active_slots_per_second > 1.0 + 1e-9
     st.caption(
         f"Current active control: {'paused' if bool(current_control.get('pause_simulation', False)) else 'running'} · "
-        f"{active_slots_per_second:.2f} slots/s"
+        f"speed-up {'on' if speed_up_active else 'off'} · observed {observed_speed_text}"
     )
 
     with st.form("simulation_controls_form", clear_on_submit=False):
@@ -680,13 +715,13 @@ with st.sidebar:
             value=bool(current_control.get("pause_simulation", False)),
         )
 
-        slots_per_second = st.slider(
-            "Simulation speed (slots per second)",
-            min_value=0.1,
-            max_value=6.0,
-            value=min(float(current_slots_per_second), 6.0),
-            step=0.1,
+        speed_up_mode = st.checkbox(
+            "Enable speed-up mode",
+            value=speed_up_active,
+            help="When off, the simulation runs at 1.00 slot/s. When on, the dashboard switches to faster mode. Check the observed speed above for the actual rate.",
         )
+
+        target_slots_per_second = 6.0 if speed_up_mode else 1.0
 
         apply_controls = st.form_submit_button(
             "Apply simulation controls",
@@ -694,7 +729,7 @@ with st.sidebar:
         )
 
     if apply_controls:
-        tick_seconds = 1.0 / max(slots_per_second, 0.1)
+        tick_seconds = 1.0 / max(target_slots_per_second, 1.0)
         write_control(
             {
                 "pause_simulation": pause_simulation,
@@ -705,7 +740,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.success(
             f"Applied: pause_simulation={pause_simulation}, "
-            f"tick_seconds={tick_seconds:.3f} ({slots_per_second:.2f} slots/s)"
+            f"speed-up mode={'on' if speed_up_mode else 'off'}"
         )
         st.rerun()
 
@@ -717,7 +752,6 @@ if not st.session_state.pause_dashboard_updates:
 
 st.title("Microgrid Final Dashboard")
 
-summary_df = load_summary()
 if summary_df.empty:
     st.warning("No summary data in the database yet.")
     st.stop()
@@ -1006,14 +1040,14 @@ st.caption("Compares external grid dependence against total internal trading.")
 fig1 = base_figure("Energy (kWh)")
 add_line(fig1, summary_df["slot"], summary_df["grid_import_kwh"], "Grid Energy Bought (kWh)", "#1565C0")
 add_line(fig1, summary_df["slot"], summary_df["p2p_trade_kwh"], "P2P Energy Traded (kWh)", "#FF8F00")
-st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
+st.plotly_chart(fig1, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
 subsection_title("Forecast Demand vs Actual Demand")
 st.caption("Compares predicted community demand with measured demand.")
 fig2 = base_figure("Demand (kWh)")
 add_line(fig2, summary_df["slot"], summary_df["predicted_demand_kwh"], "Forecast Demand (kWh)", "#4FC3F7", 1.4)
-add_line(fig2, summary_df["slot"], summary_df["actual_demand_kwh"], "Actual Demand (kWh)", "#C62828", 1.7)
-st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+add_line(fig2, summary_df["slot"], summary_df["actual_demand_kwh"], "Actual Demand (kWh)", "#C62828", 1.7, dash="dot")
+st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
 section_header("Financial Performance")
 
@@ -1022,20 +1056,20 @@ st.caption("Shows the external money paid to the grid and earned from the grid."
 fig3 = base_figure("GBP (£)")
 add_line(fig3, summary_df["slot"], summary_df["grid_import_cost_gbp"], "Cost of Buying from Grid (£)", "#D32F2F")
 add_line(fig3, summary_df["slot"], summary_df["grid_export_revenue_gbp"], "Revenue from Selling to Grid (£)", "#2E7D32")
-st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
 subsection_title("Net External Cost Over Time")
 st.caption("Shows net external cost over time.")
 fig4 = base_figure("GBP (£)")
 add_line(fig4, summary_df["slot"], summary_df["net_external_cost_gbp"], "Net External Cost (£)", "#3949AB")
-st.plotly_chart(fig4, use_container_width=True, config={"displayModeBar": False})
+st.plotly_chart(fig4, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
 subsection_title("Grid Energy Bought vs Energy Sold to Grid")
 st.caption("Shows external energy import and export over time.")
 fig5 = base_figure("Energy (kWh)")
 add_line(fig5, summary_df["slot"], summary_df["grid_import_kwh"], "Grid Energy Bought (kWh)", "#00838F")
 add_line(fig5, summary_df["slot"], summary_df["grid_export_kwh"], "Energy Sold to Grid (kWh)", "#66BB6A")
-st.plotly_chart(fig5, use_container_width=True, config={"displayModeBar": False})
+st.plotly_chart(fig5, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
 section_header("Individual household breakdown")
 st.markdown(
@@ -1226,17 +1260,17 @@ if household_ids:
         st.caption("Compares household-level predicted demand with measured demand.")
         fig8 = base_figure("Demand (kWh)")
         add_line(fig8, h_df_hist["slot"], h_df_hist["predicted_demand_kwh"], "Forecast Demand (kWh)", "#4FC3F7", 1.4)
-        add_line(fig8, h_df_hist["slot"], h_df_hist["actual_demand_kwh"], "Actual Demand (kWh)", "#C62828", 1.7)
-        st.plotly_chart(fig8, use_container_width=True, config={"displayModeBar": False})
+        add_line(fig8, h_df_hist["slot"], h_df_hist["actual_demand_kwh"], "Actual Demand (kWh)", "#C62828", 1.7, dash="dot")
+        st.plotly_chart(fig8, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
         subsection_title(f"Household {selected_h}: PV Output")
         st.caption("Shows household photovoltaic generation over time.")
         fig9 = base_figure("PV Output (kWh)")
         add_line(fig9, h_df_hist["slot"], h_df_hist["pv_kwh"], "PV Output (kWh)", "#FB8C00")
-        st.plotly_chart(fig9, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig9, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
         subsection_title(f"Household {selected_h}: Battery State of Charge")
         st.caption("Shows battery state of charge over time.")
         fig10 = base_figure("State of Charge")
         add_line(fig10, h_df_hist["slot"], h_df_hist["soc"], "State of Charge", "#3949AB")
-        st.plotly_chart(fig10, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig10, use_container_width=True, config=PLOTLY_CHART_CONFIG)

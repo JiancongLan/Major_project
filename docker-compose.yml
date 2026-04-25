@@ -1,7 +1,5 @@
 x-sim-config: &sim-config
-  SIM_SEASON: "spring"
-  SIM_START_DATE: "2013-02-27 00:00:00"
-  SIM_END_DATE: "2014-02-27 23:00:00"
+  SIM_SEASON: "winter"
   TARIFF_TARGET_YEAR: "2025"
   TARIFF_AGG: "median"
   TOU_CSV_PATH: "ToU_London.csv"
@@ -12,135 +10,197 @@ x-household-env: &household-env
   PARAMS_FILE: "household_params.csv"
   OUTPUT_ROOT: "/shared/outputs"
   FORECAST_MODE: "cnn6"
-  CNN_MODEL_PATH: "models/LSTM64x32_global.keras"
   FUTURE_SIGNAL_WEIGHTS: "1.0,0.85,0.70,0.55,0.40,0.25"
+  SIM_START_DATE: "2013-02-27 00:00:00"
+  SIM_END_DATE: "2014-02-27 23:00:00"
 
 x-household-common: &household-common
   build: ./Households
   volumes:
     - ./Households:/app
+    - ./final_models:/app/final_models:ro
     - ./shared/outputs:/shared/outputs
 
 services:
   household_mac000018:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000018" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000018"
 
   household_mac000019:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000019" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000019"
 
   household_mac000021:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000021" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000021"
 
   household_mac000022:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000022" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000022"
 
   household_mac000033:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000033" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000033"
 
   household_mac000038:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000038" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000038"
 
   household_mac000040:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000040" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000040"
 
   household_mac000041:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000041" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000041"
 
   household_mac000055:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000055" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000055"
 
   household_mac000056:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000056" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000056"
 
   household_mac000060:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000060" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000060"
 
   household_mac000068:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000068" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000068"
 
   household_mac000083:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000083" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000083"
 
   household_mac000085:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000085" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000085"
 
   household_mac000087:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000087" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000087"
 
   household_mac000089:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000089" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000089"
 
   household_mac000090:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000090" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000090"
 
   household_mac000093:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000093" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000093"
 
   household_mac000098:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000098" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000098"
 
   household_mac000099:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000099" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000099"
 
   household_mac000100:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000100" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000100"
 
   household_mac000104:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000104" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000104"
 
   household_mac000111:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000111" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000111"
 
   household_mac000112:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000112" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000112"
 
   household_mac000115:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000115" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000115"
 
   household_mac000117:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000117" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000117"
 
   household_mac000118:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000118" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000118"
 
   household_mac000121:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000121" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000121"
 
   household_mac000122:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000122" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000122"
 
   household_mac000123:
     <<: *household-common
-    environment: { <<: *household-env, HOUSEHOLD_ID: "MAC000123" }
+    environment:
+      <<: *household-env
+      HOUSEHOLD_ID: "MAC000123"
 
   market:
     build: ./market_api
@@ -171,6 +231,8 @@ services:
 
   database:
     build: ./database
+    environment:
+      DB_PATH: "/data/database.db"
     volumes:
       - ./database:/app
       - ./shared/data:/data

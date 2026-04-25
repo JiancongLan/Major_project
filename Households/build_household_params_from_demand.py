@@ -13,7 +13,6 @@ SIZE_RULES = [
 ]
 
 DEFAULTS = {
-    "model_path": "models/LSTM64x32_global.keras",
     "initial_soc": 0.50,
     "eff": 0.93,
     "soc_max": 0.95,
@@ -96,12 +95,18 @@ def build_minimal_params(avg_df: pd.DataFrame, existing_params_path: Path, outpu
 
     out = avg_df.copy()
 
+    # Keep existing non-model optional values if present
     for col, default in DEFAULTS.items():
         if col in existing.columns:
             out = out.merge(existing[["h_id", col]], on="h_id", how="left")
             out[col] = out[col].fillna(default)
         else:
             out[col] = default
+
+    # Every household gets its own fine-tuned model path based on h_id
+    out["model_path"] = out["h_id"].apply(
+        lambda h: f"final_models/fine_tuned_LSTM64x32_{h}.keras"
+    )
 
     size_bands = []
     capacities = []
@@ -123,7 +128,7 @@ def build_minimal_params(avg_df: pd.DataFrame, existing_params_path: Path, outpu
     out["max_discharge_kw"] = discharge_limits
     out["pv_size_kwp"] = pv_sizes
 
-    # force core constants for clean realism-focused runs
+    # Force core constants for clean realism-focused runs
     out["initial_soc"] = 0.50
     out["eff"] = 0.93
     out["soc_max"] = 0.95
@@ -154,7 +159,7 @@ def main() -> None:
 
     print(f"Wrote {len(out_df)} rows to {output_path}")
     print(out_df.head(15).to_string(index=False))
-    
+
 
 if __name__ == "__main__":
     main()
